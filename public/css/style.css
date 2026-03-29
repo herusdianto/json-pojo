@@ -294,8 +294,9 @@ header p {
 /* Convert Actions */
 .convert-actions {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
+    align-items: stretch;
 }
 
 .convert-btn {
@@ -331,6 +332,11 @@ header p {
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.3s ease;
+}
+
+.example-btn {
+    margin-bottom: 10px;
+    float: right;
 }
 
 .clear-btn:hover {
@@ -787,4 +793,3 @@ footer .copyright {
         min-height: 300px;
     }
 }
-

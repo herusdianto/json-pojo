@@ -13,7 +13,8 @@ class JsonToPojoConverter {
     }
 
     init() {
-        this.bindConvertButton();
+        // Remove convert button and auto-trigger convert on input changes
+        this.bindAutoConvert();
         this.bindClearButton();
         this.bindFormatButton();
         this.bindExampleButton();
@@ -54,11 +55,6 @@ class JsonToPojoConverter {
     }
 
     // ==================== Button Bindings ====================
-    bindConvertButton() {
-        const convertBtn = document.getElementById('convert-btn');
-        convertBtn.addEventListener('click', () => this.convert());
-    }
-
     bindClearButton() {
         const clearBtn = document.getElementById('clear-btn');
         clearBtn.addEventListener('click', () => this.clear());
@@ -116,6 +112,40 @@ class JsonToPojoConverter {
         });
     }
 
+    // ==================== Auto Convert Bindings ====================
+    bindAutoConvert() {
+        const inputs = [
+            document.getElementById('class-name'),
+            document.getElementById('package-name'),
+            document.getElementById('json-input'),
+            document.getElementById('use-data'),
+            document.getElementById('use-builder'),
+            document.getElementById('use-noargs'),
+            document.getElementById('use-allargs'),
+            document.getElementById('use-getter'),
+            document.getElementById('use-setter'),
+            document.getElementById('use-tostring'),
+            document.getElementById('use-equals'),
+            document.getElementById('use-jackson'),
+            document.getElementById('use-private'),
+            document.getElementById('generate-nested'),
+            document.getElementById('use-primitives')
+        ];
+        inputs.forEach(input => {
+            if (input) {
+                input.addEventListener('input', () => this.convert());
+                input.addEventListener('change', () => this.convert());
+            }
+        });
+        // Also trigger convert after loading example
+        const exampleBtn = document.getElementById('example-btn');
+        if (exampleBtn) {
+            exampleBtn.addEventListener('click', () => {
+                setTimeout(() => this.convert(), 100); // Wait for example to load
+            });
+        }
+    }
+
     // ==================== Core Functions ====================
     clear() {
         document.getElementById('json-input').value = '';
@@ -163,6 +193,9 @@ class JsonToPojoConverter {
         document.getElementById('class-name').value = 'User';
         document.getElementById('package-name').value = 'com.example.model';
         this.showStatus('Example JSON loaded!', 'success');
+
+        // Trigger convert after loading example
+        setTimeout(() => this.convert(), 100);
     }
 
     formatJson() {
