@@ -9,10 +9,17 @@ class JsonToPojoConverter {
         this.fieldCount = 0;
         this.annotationCount = 0;
         this.generatedClasses = new Map();
+        this.classUsedTypes = new Map(); // <-- add this
         this.init();
     }
 
     init() {
+        // Cache frequently used DOM elements
+        this.jsonInput = document.getElementById('json-input');
+        this.optionsForm = document.querySelector('.settings-section');
+        this.outputContainer = document.getElementById('classes-container');
+        // Restore from localStorage if available
+        this.restoreFromLocalStorage();
         // Remove convert button and auto-trigger convert on input changes
         this.bindAutoConvert();
         this.bindClearButton();
@@ -153,6 +160,7 @@ class JsonToPojoConverter {
         document.getElementById('stats').classList.add('hidden');
         document.getElementById('global-actions').classList.add('hidden');
         this.showStatus('Cleared!', 'success');
+        this.saveToLocalStorage(); // <-- Save after clear
     }
 
     loadExample() {
@@ -192,10 +200,26 @@ class JsonToPojoConverter {
         document.getElementById('json-input').value = JSON.stringify(exampleJson, null, 2);
         document.getElementById('class-name').value = 'User';
         document.getElementById('package-name').value = 'com.example.model';
+
+        // Set options checked state as in index.html
+        document.getElementById('use-data').checked = true;
+        document.getElementById('use-builder').checked = true;
+        document.getElementById('use-noargs').checked = true;
+        document.getElementById('use-allargs').checked = true;
+        document.getElementById('use-getter').checked = false;
+        document.getElementById('use-setter').checked = false;
+        document.getElementById('use-tostring').checked = true;
+        document.getElementById('use-equals').checked = false;
+        document.getElementById('use-jackson').checked = true;
+        document.getElementById('use-private').checked = true;
+        document.getElementById('generate-nested').checked = true;
+        document.getElementById('use-primitives').checked = false;
+
         this.showStatus('Example JSON loaded!', 'success');
 
         // Trigger convert after loading example
         setTimeout(() => this.convert(), 100);
+        this.saveToLocalStorage(); // <-- Save after loading example
     }
 
     formatJson() {
@@ -210,6 +234,12 @@ class JsonToPojoConverter {
     }
 
     convert() {
+        // Reset Java time usage flags before each conversion
+        this._hasLocalDate = false;
+        this._hasLocalDateTime = false;
+        this._hasInstant = false;
+        this.classUsedTypes.clear(); // <-- clear per conversion
+
         const jsonInput = document.getElementById('json-input').value.trim();
         const className = document.getElementById('class-name').value.trim() || 'MyClass';
         const packageName = document.getElementById('package-name').value.trim();
@@ -245,6 +275,7 @@ class JsonToPojoConverter {
             this.updateStats();
             document.getElementById('global-actions').classList.remove('hidden');
             this.showStatus('Conversion successful!', 'success');
+            this.saveToLocalStorage(); // <-- Save after conversion
         } catch (e) {
             this.showStatus('Error: ' + e.message, 'error');
         }
@@ -261,7 +292,18 @@ class JsonToPojoConverter {
             const classCode = this.generatedClasses.get(name);
             if (!classCode) return;
 
-            const fullCode = index === 0 ? header + classCode : header + classCode;
+            const usedTypes = this.classUsedTypes.get(name) || new Set();
+            const options = this.getOptions();
+            let classHeader = '';
+            if (header.startsWith('package ')) {
+                classHeader += header.split('\n')[0] + '\n\n'; // only package for all classes
+            }
+            const imports = this.getImportsForUsedTypes(usedTypes, options);
+            if (imports.length > 0) {
+                classHeader += imports.join('\n') + '\n\n';
+            }
+
+            const fullCode = classHeader + classCode;
 
             const box = document.createElement('div');
             box.className = 'class-box';
@@ -384,12 +426,18 @@ class JsonToPojoConverter {
         imports.push('import java.util.List;');
         imports.push('import java.util.ArrayList;');
 
+        // Java time imports if needed
+        if (this._hasLocalDate) imports.push('import java.time.LocalDate;');
+        if (this._hasLocalDateTime) imports.push('import java.time.LocalDateTime;');
+        if (this._hasInstant) imports.push('import java.time.Instant;');
+
         return imports.sort();
     }
 
     generatePojo(className, jsonObj, options) {
         this.classCount++;
         let code = '';
+        const usedTypes = new Set();
 
         // Class annotations (no indent - each class is in separate box)
         const annotations = this.generateClassAnnotations(options);
@@ -407,12 +455,12 @@ class JsonToPojoConverter {
             // If root is array, analyze first element
             if (jsonObj.length > 0 && typeof jsonObj[0] === 'object') {
                 Object.keys(jsonObj[0]).forEach(key => {
-                    fields.push(this.generateField(key, jsonObj[0][key], options, className));
+                    fields.push(this.generateField(key, jsonObj[0][key], options, className, usedTypes));
                 });
             }
         } else if (typeof jsonObj === 'object' && jsonObj !== null) {
             Object.keys(jsonObj).forEach(key => {
-                fields.push(this.generateField(key, jsonObj[key], options, className));
+                fields.push(this.generateField(key, jsonObj[key], options, className, usedTypes));
             });
         }
 
@@ -420,6 +468,7 @@ class JsonToPojoConverter {
         code += '\n}';
 
         this.generatedClasses.set(className, code);
+        this.classUsedTypes.set(className, usedTypes); // <-- store used types
         return code;
     }
 
@@ -438,17 +487,25 @@ class JsonToPojoConverter {
         return annotations;
     }
 
-    generateField(key, value, options, parentClassName) {
+    generateField(key, value, options, parentClassName, usedTypes) {
         this.fieldCount++;
         let code = '';
         const fieldName = this.toCamelCase(key);
-        const javaType = this.getJavaType(key, value, options, parentClassName);
+        const javaType = this.getJavaType(key, value, options, parentClassName, usedTypes);
         const indent = '    '; // 4 spaces for field indentation
+
+        // Track used types for imports
+        if (javaType.startsWith('List<')) usedTypes.add('List');
+        if (javaType === 'ArrayList' || javaType === 'new ArrayList<>()') usedTypes.add('ArrayList');
+        if (javaType === 'LocalDate') usedTypes.add('LocalDate');
+        if (javaType === 'LocalDateTime') usedTypes.add('LocalDateTime');
+        if (javaType === 'Instant') usedTypes.add('Instant');
 
         // Jackson annotation
         if (options.useJackson && key !== fieldName) {
             code += indent + `@JsonProperty("${key}")\n`;
             this.annotationCount++;
+            usedTypes.add('JsonProperty');
         }
 
         // Builder.Default logic
@@ -479,12 +536,14 @@ class JsonToPojoConverter {
             } else if (Array.isArray(value)) {
                 addBuilderDefault = true;
                 defaultValue = 'new ArrayList<>()';
+                usedTypes.add('ArrayList');
             }
         }
 
         if (addBuilderDefault) {
             code += indent + '@Builder.Default\n';
             this.annotationCount++;
+            usedTypes.add('Builder');
         }
 
         // Field declaration
@@ -498,16 +557,35 @@ class JsonToPojoConverter {
         return code;
     }
 
-    getJavaType(key, value, options, parentClassName) {
+    getJavaType(key, value, options, parentClassName, usedTypes) {
         if (value === null) {
             return 'Object';
         }
 
         const type = typeof value;
 
+        // Date/time detection patterns
+        const localDatePattern = /^\d{4}-\d{2}-\d{2}$/;
+        const localDateTimePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
+        const instantPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?([Zz]|[+-]\d{2}:?\d{2})$/;
+
         switch (type) {
-            case 'string':
+            case 'string': {
+                // Only set usage flag if this type is actually used in a field
+                if (localDatePattern.test(value)) {
+                    usedTypes && usedTypes.add('LocalDate');
+                    return 'LocalDate';
+                }
+                if (localDateTimePattern.test(value)) {
+                    usedTypes && usedTypes.add('LocalDateTime');
+                    return 'LocalDateTime';
+                }
+                if (instantPattern.test(value)) {
+                    usedTypes && usedTypes.add('Instant');
+                    return 'Instant';
+                }
                 return 'String';
+            }
             case 'number':
                 if (Number.isInteger(value)) {
                     if (options.usePrimitives) {
@@ -521,7 +599,7 @@ class JsonToPojoConverter {
             case 'object':
                 if (Array.isArray(value)) {
                     if (value.length > 0) {
-                        const elementType = this.getJavaType(key, value[0], options, parentClassName);
+                        const elementType = this.getJavaType(key, value[0], options, parentClassName, usedTypes);
                         // If it's a nested object, generate a class for it
                         if (typeof value[0] === 'object' && !Array.isArray(value[0]) && value[0] !== null) {
                             const nestedClassName = this.toPascalCase(this.singularize(key));
@@ -544,6 +622,30 @@ class JsonToPojoConverter {
             default:
                 return 'Object';
         }
+    }
+
+    // Generate imports for a given set of used types
+    getImportsForUsedTypes(usedTypes, options) {
+        const imports = [];
+        // Lombok
+        if (options.useData) imports.push('import lombok.Data;');
+        if (usedTypes.has('Builder')) imports.push('import lombok.Builder;');
+        if (options.useNoArgs) imports.push('import lombok.NoArgsConstructor;');
+        if (options.useAllArgs) imports.push('import lombok.AllArgsConstructor;');
+        if (options.useGetter) imports.push('import lombok.Getter;');
+        if (options.useSetter) imports.push('import lombok.Setter;');
+        if (options.useToString) imports.push('import lombok.ToString;');
+        if (options.useEquals) imports.push('import lombok.EqualsAndHashCode;');
+        // Jackson
+        if (usedTypes.has('JsonProperty')) imports.push('import com.fasterxml.jackson.annotation.JsonProperty;');
+        // Java util
+        if (usedTypes.has('List')) imports.push('import java.util.List;');
+        if (usedTypes.has('ArrayList')) imports.push('import java.util.ArrayList;');
+        // Java time
+        if (usedTypes.has('LocalDate')) imports.push('import java.time.LocalDate;');
+        if (usedTypes.has('LocalDateTime')) imports.push('import java.time.LocalDateTime;');
+        if (usedTypes.has('Instant')) imports.push('import java.time.Instant;');
+        return imports.sort();
     }
 
     // ==================== Utility Functions ====================
@@ -590,6 +692,60 @@ class JsonToPojoConverter {
         setTimeout(() => {
             statusEl.classList.add('hidden');
         }, 3000);
+    }
+
+    saveToLocalStorage() {
+        const input = this.jsonInput.value;
+        const options = {};
+        this.optionsForm.querySelectorAll('input,select,textarea').forEach(el => {
+            if (el.type === 'checkbox') {
+                options[el.name] = el.checked;
+            } else {
+                options[el.name] = el.value;
+            }
+        });
+        const output = this.outputContainer.innerText;
+        const packageName = document.getElementById('package-name').value;
+        const className = document.getElementById('class-name').value;
+        localStorage.setItem('jsonpojo_input', input);
+        localStorage.setItem('jsonpojo_options', JSON.stringify(options));
+        localStorage.setItem('jsonpojo_output', output);
+        localStorage.setItem('jsonpojo_package', packageName);
+        localStorage.setItem('jsonpojo_classname', className);
+    }
+
+    restoreFromLocalStorage() {
+        const input = localStorage.getItem('jsonpojo_input');
+        const options = localStorage.getItem('jsonpojo_options');
+        const output = localStorage.getItem('jsonpojo_output');
+        const packageName = localStorage.getItem('jsonpojo_package');
+        const className = localStorage.getItem('jsonpojo_classname');
+        if (input !== null) {
+            this.jsonInput.value = input;
+        }
+        if (packageName !== null) {
+            document.getElementById('package-name').value = packageName;
+        }
+        if (className !== null) {
+            document.getElementById('class-name').value = className;
+        }
+        if (options !== null) {
+            try {
+                const opts = JSON.parse(options);
+                this.optionsForm.querySelectorAll('input,select,textarea').forEach(el => {
+                    if (el.type === 'checkbox') {
+                        el.checked = !!opts[el.name];
+                    } else if (opts[el.name] !== undefined) {
+                        el.value = opts[el.name];
+                    }
+                });
+            } catch (e) {}
+        }
+        // Output is always generated from input/options, so no need to restore output directly
+        // Instead, trigger auto-convert if input/options exist
+        if (input !== null || options !== null) {
+            this.convert();
+        }
     }
 }
 
