@@ -704,12 +704,10 @@ class JsonToPojoConverter {
                 options[el.name] = el.value;
             }
         });
-        const output = this.outputContainer.innerText;
         const packageName = document.getElementById('package-name').value;
         const className = document.getElementById('class-name').value;
         localStorage.setItem('jsonpojo_input', input);
         localStorage.setItem('jsonpojo_options', JSON.stringify(options));
-        localStorage.setItem('jsonpojo_output', output);
         localStorage.setItem('jsonpojo_package', packageName);
         localStorage.setItem('jsonpojo_classname', className);
     }
@@ -717,7 +715,6 @@ class JsonToPojoConverter {
     restoreFromLocalStorage() {
         const input = localStorage.getItem('jsonpojo_input');
         const options = localStorage.getItem('jsonpojo_options');
-        const output = localStorage.getItem('jsonpojo_output');
         const packageName = localStorage.getItem('jsonpojo_package');
         const className = localStorage.getItem('jsonpojo_classname');
         if (input !== null) {
