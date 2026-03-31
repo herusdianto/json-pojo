@@ -1,6 +1,5 @@
 /**
- * JSON to POJO Converter - Convert JSON to Java POJO with Lombok
- * 100% Client-side processing
+ * Main entry point for JSON to POJO Converter
  */
 
 class JsonToPojoConverter {
@@ -9,7 +8,10 @@ class JsonToPojoConverter {
         this.fieldCount = 0;
         this.annotationCount = 0;
         this.generatedClasses = new Map();
-        this.classUsedTypes = new Map(); // <-- add this
+        this.classUsedTypes = new Map();
+        this._hasLocalDate = false;
+        this._hasLocalDateTime = false;
+        this._hasInstant = false;
         this.init();
     }
 
@@ -18,191 +20,99 @@ class JsonToPojoConverter {
         this.jsonInput = document.getElementById('json-input');
         this.optionsForm = document.querySelector('.settings-section');
         this.outputContainer = document.getElementById('classes-container');
+        
         // Restore from localStorage if available
         this.restoreFromLocalStorage();
         this.restorePojoToJsonFromLocalStorage();
-        // Remove convert button and auto-trigger convert on input changes
+        
+        // Bind event handlers
         this.bindAutoConvert();
         this.bindClearButton();
         this.bindFormatButton();
         this.bindExampleButton();
         this.bindGlobalActions();
-        this.initThemeToggle();
+        initThemeToggle();
         this.bindClassNameChange();
-        this.setCurrentYear();
+        setCurrentYear();
         this.bindPojoToJsonActions();
-        this.initModeToggle();
+        initModeToggle();
     }
 
-    setCurrentYear() {
-        const yearElement = document.getElementById('currentYear');
-        if (yearElement) {
-            yearElement.textContent = new Date().getFullYear();
+    restoreFromLocalStorage() {
+        const data = restoreFromLocalStorage();
+        if (data.input !== null) {
+            this.jsonInput.value = data.input;
+        }
+        if (data.packageName !== null) {
+            document.getElementById('package-name').value = data.packageName;
+        }
+        if (data.className !== null) {
+            document.getElementById('class-name').value = data.className;
+        }
+        if (data.options !== null) {
+            applyOptions(data.options);
+        }
+        // Trigger auto-convert if input/options exist
+        if (data.input !== null || data.options !== null) {
+            this.convert();
         }
     }
 
-    // ==================== Mode Tabs ====================
-    initModeToggle() {
-        const modeTabs = document.querySelectorAll('.mode-tab');
-        const jsonToPojoSection = document.getElementById('json-to-pojo-section');
-        const pojoToJsonSection = document.getElementById('pojo-to-json-section');
-
-        if (!modeTabs.length) return;
-
-        modeTabs.forEach(tab => {
-            tab.addEventListener('click', () => {
-                const mode = tab.getAttribute('data-mode');
-                
-                // Update active tab
-                modeTabs.forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                // Show corresponding section
-                if (mode === 'json-to-pojo') {
-                    jsonToPojoSection.classList.add('active');
-                    pojoToJsonSection.classList.remove('active');
-                    localStorage.setItem('jsonpojo_mode', 'json-to-pojo');
-                } else {
-                    jsonToPojoSection.classList.remove('active');
-                    pojoToJsonSection.classList.add('active');
-                    localStorage.setItem('jsonpojo_mode', 'pojo-to-json');
-                }
-            });
-        });
-
-        // Restore mode from localStorage
-        const savedMode = localStorage.getItem('jsonpojo_mode');
-        if (savedMode === 'pojo-to-json') {
-            modeTabs.forEach(t => t.classList.remove('active'));
-            document.querySelector('.mode-tab[data-mode="pojo-to-json"]').classList.add('active');
-            jsonToPojoSection.classList.remove('active');
-            pojoToJsonSection.classList.add('active');
+    restorePojoToJsonFromLocalStorage() {
+        const pojoInput = restorePojoToJsonFromLocalStorage();
+        if (pojoInput !== null) {
+            document.getElementById('pojo-input').value = pojoInput;
+            convertPojoToJson(pojoInput);
         }
     }
 
-    // ==================== Theme Toggle ====================
-    initThemeToggle() {
-        const themeSwitch = document.getElementById('theme-switch');
-        const themeIcon = document.getElementById('theme-icon');
-
-        const savedTheme = localStorage.getItem('theme') || 'dark';
-        document.body.classList.toggle('dark-mode', savedTheme === 'dark');
-        this.updateThemeIcon(themeIcon, savedTheme);
-
-        themeSwitch.addEventListener('click', () => {
-            const isDark = document.body.classList.toggle('dark-mode');
-            const newTheme = isDark ? 'dark' : 'light';
-            localStorage.setItem('theme', newTheme);
-            this.updateThemeIcon(themeIcon, newTheme);
-        });
-    }
-
-    updateThemeIcon(iconElement, theme) {
-        iconElement.innerHTML = theme === 'dark'
-            ? `<svg class="sun-icon" viewBox="0 0 24 24" width="28" height="28"><path d="M12 7a5 5 0 100 10 5 5 0 000-10zM2 13h2a1 1 0 100-2H2a1 1 0 100 2zm18 0h2a1 1 0 100-2h-2a1 1 0 100 2zM11 2v2a1 1 0 102 0V2a1 1 0 10-2 0zm0 18v2a1 1 0 102 0v-2a1 1 0 10-2 0zM5.99 4.58a1 1 0 10-1.41 1.41l1.06 1.06a1 1 0 101.41-1.41L5.99 4.58zm12.37 12.37a1 1 0 10-1.41 1.41l1.06 1.06a1 1 0 101.41-1.41l-1.06-1.06zm1.06-10.96a1 1 0 10-1.41-1.41l-1.06 1.06a1 1 0 101.41 1.41l1.06-1.06zM7.05 18.36a1 1 0 10-1.41-1.41l-1.06 1.06a1 1 0 101.41 1.41l1.06-1.06z"></path></svg>`
-            : `<svg class="moon-icon" viewBox="0 0 24 24" width="28" height="28"><path d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"></path></svg>`;
-    }
-
-    // ==================== Button Bindings ====================
     bindClearButton() {
-        const clearBtn = document.getElementById('clear-btn');
-        clearBtn.addEventListener('click', () => this.clear());
+        const clearFn = () => this.clear();
+        bindClearButton(clearFn);
     }
 
     bindFormatButton() {
-        const formatBtn = document.getElementById('format-btn');
-        formatBtn.addEventListener('click', () => this.formatJson());
+        const formatFn = () => this.formatJson();
+        bindFormatButton(formatFn);
     }
 
     bindExampleButton() {
-        const exampleBtn = document.getElementById('example-btn');
-        exampleBtn.addEventListener('click', () => this.loadExample());
+        const loadExampleFn = () => this.loadExample();
+        bindExampleButton(loadExampleFn);
     }
 
     bindClassNameChange() {
-        const classNameInput = document.getElementById('class-name');
-        classNameInput.addEventListener('input', () => {
-            // Update download all filename based on class name
-        });
+        bindClassNameChange();
     }
 
     bindGlobalActions() {
-        const copyAllBtn = document.getElementById('copy-all-btn');
-        const downloadAllBtn = document.getElementById('download-all-btn');
-
-        copyAllBtn.addEventListener('click', () => {
-            const allCode = this.getAllCode();
-            if (allCode) {
-                navigator.clipboard.writeText(allCode)
-                    .then(() => this.showStatus('All classes copied to clipboard!', 'success'))
-                    .catch(() => this.showStatus('Failed to copy', 'error'));
-            } else {
-                this.showStatus('Nothing to copy', 'error');
-            }
-        });
-
-        downloadAllBtn.addEventListener('click', () => {
-            const allCode = this.getAllCode();
-            if (allCode) {
-                const className = document.getElementById('class-name').value.trim() || 'MyClass';
-                const blob = new Blob([allCode], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${className}_all.java`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                this.showStatus('All classes downloaded!', 'success');
-            } else {
-                this.showStatus('Nothing to download', 'error');
-            }
-        });
+        const getAllCodeFn = () => getAllCode();
+        bindGlobalActions(getAllCodeFn);
     }
 
-    // ==================== Auto Convert Bindings ====================
     bindAutoConvert() {
-        const inputs = [
-            document.getElementById('class-name'),
-            document.getElementById('package-name'),
-            document.getElementById('json-input'),
-            document.getElementById('use-data'),
-            document.getElementById('use-builder'),
-            document.getElementById('use-noargs'),
-            document.getElementById('use-allargs'),
-            document.getElementById('use-getter'),
-            document.getElementById('use-setter'),
-            document.getElementById('use-tostring'),
-            document.getElementById('use-equals'),
-            document.getElementById('use-jackson'),
-            document.getElementById('use-private'),
-            document.getElementById('generate-nested'),
-            document.getElementById('use-primitives')
-        ];
-        inputs.forEach(input => {
-            if (input) {
-                input.addEventListener('input', () => this.convert());
-                input.addEventListener('change', () => this.convert());
-            }
-        });
-        // Also trigger convert after loading example
-        const exampleBtn = document.getElementById('example-btn');
-        if (exampleBtn) {
-            exampleBtn.addEventListener('click', () => {
-                setTimeout(() => this.convert(), 100); // Wait for example to load
-            });
-        }
+        const convertFn = () => this.convert();
+        bindAutoConvert(convertFn);
     }
 
-    // ==================== Core Functions ====================
+    bindPojoToJsonActions() {
+        const convertFn = () => {
+            const pojoInput = document.getElementById('pojo-input').value.trim();
+            convertPojoToJson(pojoInput);
+        };
+        const clearFn = () => clearPojoToJson();
+        const copyFn = () => copyPojoToJson();
+        const downloadFn = () => downloadPojoToJson();
+        bindPojoToJsonActions(convertFn, clearFn, copyFn, downloadFn);
+    }
+
     clear() {
         document.getElementById('json-input').value = '';
         document.getElementById('classes-container').innerHTML = '<div class="empty-state"><p>Java POJO classes will appear here...</p></div>';
         document.getElementById('stats').classList.add('hidden');
         document.getElementById('global-actions').classList.add('hidden');
-        this.showStatus('Cleared!', 'success');
-        this.saveToLocalStorage(); // <-- Save after clear
+        showStatus('Cleared!', 'success');
+        this.saveToLocalStorage();
     }
 
     loadExample() {
@@ -243,7 +153,7 @@ class JsonToPojoConverter {
         document.getElementById('class-name').value = 'User';
         document.getElementById('package-name').value = 'com.example.model';
 
-        // Set options checked state as in index.html
+        // Set options checked state
         document.getElementById('use-data').checked = true;
         document.getElementById('use-builder').checked = true;
         document.getElementById('use-noargs').checked = true;
@@ -257,11 +167,11 @@ class JsonToPojoConverter {
         document.getElementById('generate-nested').checked = true;
         document.getElementById('use-primitives').checked = false;
 
-        this.showStatus('Example JSON loaded!', 'success');
+        showStatus('Example JSON loaded!', 'success');
 
         // Trigger convert after loading example
         setTimeout(() => this.convert(), 100);
-        this.saveToLocalStorage(); // <-- Save after loading example
+        this.saveToLocalStorage();
     }
 
     formatJson() {
@@ -269,9 +179,9 @@ class JsonToPojoConverter {
         try {
             const parsed = JSON.parse(jsonInput.value);
             jsonInput.value = JSON.stringify(parsed, null, 2);
-            this.showStatus('JSON formatted!', 'success');
+            showStatus('JSON formatted!', 'success');
         } catch (e) {
-            this.showStatus('Invalid JSON: ' + e.message, 'error');
+            showStatus('Invalid JSON: ' + e.message, 'error');
         }
     }
 
@@ -280,14 +190,14 @@ class JsonToPojoConverter {
         this._hasLocalDate = false;
         this._hasLocalDateTime = false;
         this._hasInstant = false;
-        this.classUsedTypes.clear(); // <-- clear per conversion
+        this.classUsedTypes.clear();
 
         const jsonInput = document.getElementById('json-input').value.trim();
         const className = document.getElementById('class-name').value.trim() || 'MyClass';
         const packageName = document.getElementById('package-name').value.trim();
 
         if (!jsonInput) {
-            this.showStatus('Please enter JSON to convert', 'error');
+            showStatus('Please enter JSON to convert', 'error');
             return;
         }
 
@@ -296,131 +206,35 @@ class JsonToPojoConverter {
             this.resetCounters();
             this.generatedClasses.clear();
 
-            const options = this.getOptions();
+            const options = getOptions();
 
             // Generate main class and nested classes
-            this.generatePojo(className, jsonObj, options);
+            generatePojo(className, jsonObj, options, this.generatedClasses, this.classUsedTypes, this);
 
             // Build header (package + imports)
             let header = '';
             if (packageName) {
                 header += `package ${packageName};\n\n`;
             }
-            const imports = this.collectImports(options);
+            const imports = collectImports(options, {
+                hasLocalDate: this._hasLocalDate,
+                hasLocalDateTime: this._hasLocalDateTime,
+                hasInstant: this._hasInstant
+            });
             if (imports.length > 0) {
                 header += imports.join('\n') + '\n\n';
             }
 
             // Render separate boxes for each class
-            this.renderClassBoxes(header, className);
+            renderClassBoxes(header, className, this.generatedClasses, this.classUsedTypes, options, getImportsForUsedTypes);
 
-            this.updateStats();
+            updateStats(this.classCount, this.fieldCount, this.annotationCount);
             document.getElementById('global-actions').classList.remove('hidden');
-            this.showStatus('Conversion successful!', 'success');
-            this.saveToLocalStorage(); // <-- Save after conversion
+            showStatus('Conversion successful!', 'success');
+            this.saveToLocalStorage();
         } catch (e) {
-            this.showStatus('Error: ' + e.message, 'error');
+            showStatus('Error: ' + e.message, 'error');
         }
-    }
-
-    renderClassBoxes(header, mainClassName) {
-        const container = document.getElementById('classes-container');
-        container.innerHTML = '';
-
-        // Render main class first, then nested classes
-        const classNames = [mainClassName, ...Array.from(this.generatedClasses.keys()).filter(name => name !== mainClassName)];
-
-        classNames.forEach((name, index) => {
-            const classCode = this.generatedClasses.get(name);
-            if (!classCode) return;
-
-            const usedTypes = this.classUsedTypes.get(name) || new Set();
-            const options = this.getOptions();
-            let classHeader = '';
-            if (header.startsWith('package ')) {
-                classHeader += header.split('\n')[0] + '\n\n'; // only package for all classes
-            }
-            const imports = this.getImportsForUsedTypes(usedTypes, options);
-            if (imports.length > 0) {
-                classHeader += imports.join('\n') + '\n\n';
-            }
-
-            const fullCode = classHeader + classCode;
-
-            const box = document.createElement('div');
-            box.className = 'class-box';
-            box.innerHTML = `
-                <div class="class-box-header">
-                    <span class="class-name">${name}.java</span>
-                    <div class="class-box-actions">
-                        <button class="copy-btn" data-code="${this.escapeHtml(fullCode)}">Copy</button>
-                        <button class="download-btn" data-code="${this.escapeHtml(fullCode)}" data-filename="${name}.java">Download</button>
-                    </div>
-                </div>
-                <pre class="class-code"><code>${this.escapeHtml(fullCode)}</code></pre>
-            `;
-            container.appendChild(box);
-        });
-
-        // Bind copy/download buttons for new boxes
-        this.bindClassBoxButtons();
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-
-    bindClassBoxButtons() {
-        document.querySelectorAll('.class-box .copy-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const code = btn.getAttribute('data-code');
-                // Decode HTML entities
-                const textarea = document.createElement('textarea');
-                textarea.innerHTML = code;
-                const decodedCode = textarea.value;
-
-                navigator.clipboard.writeText(decodedCode)
-                    .then(() => this.showStatus('Copied to clipboard!', 'success'))
-                    .catch(() => this.showStatus('Failed to copy', 'error'));
-            });
-        });
-
-        document.querySelectorAll('.class-box .download-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const code = btn.getAttribute('data-code');
-                const filename = btn.getAttribute('data-filename');
-
-                // Decode HTML entities
-                const textarea = document.createElement('textarea');
-                textarea.innerHTML = code;
-                const decodedCode = textarea.value;
-
-                const blob = new Blob([decodedCode], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = filename;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                this.showStatus(`Downloaded ${filename}!`, 'success');
-            });
-        });
-    }
-
-    getAllCode() {
-        let allCode = '';
-        document.querySelectorAll('.class-box .copy-btn').forEach((btn, index) => {
-            const code = btn.getAttribute('data-code');
-            const textarea = document.createElement('textarea');
-            textarea.innerHTML = code;
-            if (index > 0) allCode += '\n\n';
-            allCode += textarea.value;
-        });
-        return allCode;
     }
 
     resetCounters() {
@@ -429,571 +243,15 @@ class JsonToPojoConverter {
         this.annotationCount = 0;
     }
 
-    getOptions() {
-        return {
-            useData: document.getElementById('use-data').checked,
-            useBuilder: document.getElementById('use-builder').checked,
-            useNoArgs: document.getElementById('use-noargs').checked,
-            useAllArgs: document.getElementById('use-allargs').checked,
-            useGetter: document.getElementById('use-getter').checked,
-            useSetter: document.getElementById('use-setter').checked,
-            useToString: document.getElementById('use-tostring').checked,
-            useEquals: document.getElementById('use-equals').checked,
-            useJackson: document.getElementById('use-jackson').checked,
-            usePrivate: document.getElementById('use-private').checked,
-            generateNested: document.getElementById('generate-nested').checked,
-            usePrimitives: document.getElementById('use-primitives').checked
-        };
-    }
-
-    collectImports(options) {
-        const imports = [];
-
-        // Lombok imports
-        if (options.useData) imports.push('import lombok.Data;');
-        if (options.useBuilder) imports.push('import lombok.Builder;');
-        if (options.useNoArgs) imports.push('import lombok.NoArgsConstructor;');
-        if (options.useAllArgs) imports.push('import lombok.AllArgsConstructor;');
-        if (options.useGetter) imports.push('import lombok.Getter;');
-        if (options.useSetter) imports.push('import lombok.Setter;');
-        if (options.useToString) imports.push('import lombok.ToString;');
-        if (options.useEquals) imports.push('import lombok.EqualsAndHashCode;');
-
-        // Jackson imports
-        if (options.useJackson) {
-            imports.push('import com.fasterxml.jackson.annotation.JsonProperty;');
-        }
-
-        // Java imports
-        imports.push('import java.util.List;');
-        imports.push('import java.util.ArrayList;');
-
-        // Java time imports if needed
-        if (this._hasLocalDate) imports.push('import java.time.LocalDate;');
-        if (this._hasLocalDateTime) imports.push('import java.time.LocalDateTime;');
-        if (this._hasInstant) imports.push('import java.time.Instant;');
-
-        return imports.sort();
-    }
-
-    generatePojo(className, jsonObj, options) {
-        this.classCount++;
-        let code = '';
-        const usedTypes = new Set();
-
-        // Class annotations (no indent - each class is in separate box)
-        const annotations = this.generateClassAnnotations(options);
-        annotations.forEach(ann => {
-            code += ann + '\n';
-            this.annotationCount++;
-        });
-
-        // Class declaration
-        code += `public class ${this.toPascalCase(className)} {\n\n`;
-
-        // Fields
-        const fields = [];
-        if (Array.isArray(jsonObj)) {
-            // If root is array, analyze first element
-            if (jsonObj.length > 0 && typeof jsonObj[0] === 'object') {
-                Object.keys(jsonObj[0]).forEach(key => {
-                    fields.push(this.generateField(key, jsonObj[0][key], options, className, usedTypes));
-                });
-            }
-        } else if (typeof jsonObj === 'object' && jsonObj !== null) {
-            Object.keys(jsonObj).forEach(key => {
-                fields.push(this.generateField(key, jsonObj[key], options, className, usedTypes));
-            });
-        }
-
-        code += fields.join('\n\n');
-        code += '\n}';
-
-        this.generatedClasses.set(className, code);
-        this.classUsedTypes.set(className, usedTypes); // <-- store used types
-        return code;
-    }
-
-    generateClassAnnotations(options) {
-        const annotations = [];
-
-        if (options.useData) annotations.push('@Data');
-        if (options.useBuilder) annotations.push('@Builder');
-        if (options.useNoArgs) annotations.push('@NoArgsConstructor');
-        if (options.useAllArgs) annotations.push('@AllArgsConstructor');
-        if (options.useGetter) annotations.push('@Getter');
-        if (options.useSetter) annotations.push('@Setter');
-        if (options.useToString) annotations.push('@ToString');
-        if (options.useEquals) annotations.push('@EqualsAndHashCode');
-
-        return annotations;
-    }
-
-    generateField(key, value, options, parentClassName, usedTypes) {
-        this.fieldCount++;
-        let code = '';
-        const fieldName = this.toCamelCase(key);
-        const javaType = this.getJavaType(key, value, options, parentClassName, usedTypes);
-        const indent = '    '; // 4 spaces for field indentation
-
-        // Track used types for imports
-        if (javaType.startsWith('List<')) usedTypes.add('List');
-        if (javaType === 'ArrayList' || javaType === 'new ArrayList<>()') usedTypes.add('ArrayList');
-        if (javaType === 'LocalDate') usedTypes.add('LocalDate');
-        if (javaType === 'LocalDateTime') usedTypes.add('LocalDateTime');
-        if (javaType === 'Instant') usedTypes.add('Instant');
-
-        // Jackson annotation
-        if (options.useJackson && key !== fieldName) {
-            code += indent + `@JsonProperty("${key}")\n`;
-            this.annotationCount++;
-            usedTypes.add('JsonProperty');
-        }
-
-        // Builder.Default logic
-        let addBuilderDefault = false;
-        let defaultValue = null;
-        if (options.useBuilder) {
-            // Only for primitive/wrapper/boolean/List
-            const type = typeof value;
-            if (type === 'number') {
-                addBuilderDefault = true;
-                // Tentukan default value sesuai tipe Java
-                if (javaType === 'double' || javaType === 'Double') {
-                    defaultValue = '0D';
-                } else if (javaType === 'float' || javaType === 'Float') {
-                    defaultValue = '0F';
-                } else if (javaType === 'long' || javaType === 'Long') {
-                    defaultValue = '0L';
-                } else if (javaType === 'short' || javaType === 'Short') {
-                    defaultValue = '0';
-                } else if (javaType === 'byte' || javaType === 'Byte') {
-                    defaultValue = '0';
-                } else { // int, Integer, default
-                    defaultValue = '0';
-                }
-            } else if (type === 'boolean') {
-                addBuilderDefault = true;
-                defaultValue = 'false';
-            } else if (Array.isArray(value)) {
-                addBuilderDefault = true;
-                defaultValue = 'new ArrayList<>()';
-                usedTypes.add('ArrayList');
-            }
-        }
-
-        if (addBuilderDefault) {
-            code += indent + '@Builder.Default\n';
-            this.annotationCount++;
-            usedTypes.add('Builder');
-        }
-
-        // Field declaration
-        const visibility = options.usePrivate ? 'private' : 'public';
-        code += indent + `${visibility} ${javaType} ${fieldName}`;
-        if (addBuilderDefault && defaultValue !== null) {
-            code += ` = ${defaultValue}`;
-        }
-        code += ';';
-
-        return code;
-    }
-
-    getJavaType(key, value, options, parentClassName, usedTypes) {
-        if (value === null) {
-            return 'Object';
-        }
-
-        const type = typeof value;
-
-        // Date/time detection patterns
-        const localDatePattern = /^\d{4}-\d{2}-\d{2}$/;
-        const localDateTimePattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/;
-        const instantPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?([Zz]|[+-]\d{2}:?\d{2})$/;
-
-        switch (type) {
-            case 'string': {
-                // Only set usage flag if this type is actually used in a field
-                if (localDatePattern.test(value)) {
-                    usedTypes && usedTypes.add('LocalDate');
-                    return 'LocalDate';
-                }
-                if (localDateTimePattern.test(value)) {
-                    usedTypes && usedTypes.add('LocalDateTime');
-                    return 'LocalDateTime';
-                }
-                if (instantPattern.test(value)) {
-                    usedTypes && usedTypes.add('Instant');
-                    return 'Instant';
-                }
-                return 'String';
-            }
-            case 'number':
-                if (Number.isInteger(value)) {
-                    if (options.usePrimitives) {
-                        return value > 2147483647 || value < -2147483648 ? 'long' : 'int';
-                    }
-                    return value > 2147483647 || value < -2147483648 ? 'Long' : 'Integer';
-                }
-                return options.usePrimitives ? 'double' : 'Double';
-            case 'boolean':
-                return options.usePrimitives ? 'boolean' : 'Boolean';
-            case 'object':
-                if (Array.isArray(value)) {
-                    if (value.length > 0) {
-                        const elementType = this.getJavaType(key, value[0], options, parentClassName, usedTypes);
-                        // If it's a nested object, generate a class for it
-                        if (typeof value[0] === 'object' && !Array.isArray(value[0]) && value[0] !== null) {
-                            const nestedClassName = this.toPascalCase(this.singularize(key));
-                            if (!this.generatedClasses.has(nestedClassName)) {
-                                this.generatePojo(nestedClassName, value[0], options);
-                            }
-                            return `List<${nestedClassName}>`;
-                        }
-                        return `List<${elementType}>`;
-                    }
-                    return 'List<Object>';
-                } else {
-                    // Nested object - generate a class for it
-                    const nestedClassName = this.toPascalCase(key);
-                    if (!this.generatedClasses.has(nestedClassName)) {
-                        this.generatePojo(nestedClassName, value, options);
-                    }
-                    return nestedClassName;
-                }
-            default:
-                return 'Object';
-        }
-    }
-
-    // Generate imports for a given set of used types
-    getImportsForUsedTypes(usedTypes, options) {
-        const imports = [];
-        // Lombok
-        if (options.useData) imports.push('import lombok.Data;');
-        if (usedTypes.has('Builder')) imports.push('import lombok.Builder;');
-        if (options.useNoArgs) imports.push('import lombok.NoArgsConstructor;');
-        if (options.useAllArgs) imports.push('import lombok.AllArgsConstructor;');
-        if (options.useGetter) imports.push('import lombok.Getter;');
-        if (options.useSetter) imports.push('import lombok.Setter;');
-        if (options.useToString) imports.push('import lombok.ToString;');
-        if (options.useEquals) imports.push('import lombok.EqualsAndHashCode;');
-        // Jackson
-        if (usedTypes.has('JsonProperty')) imports.push('import com.fasterxml.jackson.annotation.JsonProperty;');
-        // Java util
-        if (usedTypes.has('List')) imports.push('import java.util.List;');
-        if (usedTypes.has('ArrayList')) imports.push('import java.util.ArrayList;');
-        // Java time
-        if (usedTypes.has('LocalDate')) imports.push('import java.time.LocalDate;');
-        if (usedTypes.has('LocalDateTime')) imports.push('import java.time.LocalDateTime;');
-        if (usedTypes.has('Instant')) imports.push('import java.time.Instant;');
-        return imports.sort();
-    }
-
-    // ==================== POJO to JSON Conversion ====================
-    convertPojoToJson() {
-        const pojoInput = document.getElementById('pojo-input').value.trim();
-        
-        if (!pojoInput) {
-            this.showStatus('Please enter Java POJO code to convert', 'error');
-            return;
-        }
-
-        try {
-            const jsonObj = this.parsePojoToJson(pojoInput);
-            const jsonOutput = JSON.stringify(jsonObj, null, 2);
-            document.getElementById('json-output').value = jsonOutput;
-            this.showStatus('POJO to JSON conversion successful!', 'success');
-            this.savePojoToJsonToLocalStorage();
-        } catch (e) {
-            this.showStatus('Error parsing POJO: ' + e.message, 'error');
-        }
-    }
-
-    parsePojoToJson(pojoCode) {
-        const result = {};
-        
-        // Remove comments
-        pojoCode = pojoCode.replace(/\/\/[\s\S]*?\n/g, '');
-        pojoCode = pojoCode.replace(/\/\*[\s\S]*?\*\//g, '');
-        
-        // Find all field declarations
-        const fieldPattern = /(?:private|public|protected)?\s+(\w+(?:<[^>]+>)?)\s+(\w+)\s*;/g;
-        let match;
-        
-        while ((match = fieldPattern.exec(pojoCode)) !== null) {
-            const type = match[1];
-            const fieldName = match[2];
-            result[fieldName] = this.generateSampleValue(type, fieldName);
-        }
-        
-        return result;
-    }
-
-    generateSampleValue(type, fieldName) {
-        // Handle generic types like List<String>, Map<String, Object>
-        const genericMatch = type.match(/^(\w+)<(.+)>$/);
-        if (genericMatch) {
-            const containerType = genericMatch[1];
-            const innerType = genericMatch[2];
-            
-            if (containerType === 'List' || containerType === 'ArrayList') {
-                return [this.generateSampleValue(innerType.trim(), fieldName)];
-            }
-            if (containerType === 'Map') {
-                return { "key": this.generateSampleValue(innerType.split(',')[1]?.trim() || 'Object', fieldName) };
-            }
-            if (containerType === 'Set') {
-                return [this.generateSampleValue(innerType.trim(), fieldName)];
-            }
-        }
-        
-        // Handle array types
-        if (type.endsWith('[]')) {
-            const elementType = type.slice(0, -2);
-            return [this.generateSampleValue(elementType, fieldName)];
-        }
-        
-        // Handle primitive and common types
-        const lowerFieldName = fieldName.toLowerCase();
-        
-        switch (type) {
-            case 'String':
-                if (lowerFieldName.includes('email')) return 'user@example.com';
-                if (lowerFieldName.includes('name')) return 'John Doe';
-                if (lowerFieldName.includes('phone')) return '+1-234-567-8900';
-                if (lowerFieldName.includes('address')) return '123 Main Street';
-                if (lowerFieldName.includes('city')) return 'New York';
-                if (lowerFieldName.includes('country')) return 'USA';
-                if (lowerFieldName.includes('url') || lowerFieldName.includes('link')) return 'https://example.com';
-                if (lowerFieldName.includes('date')) return '2024-01-15';
-                if (lowerFieldName.includes('time')) return '10:30:00';
-                return 'sample string';
-            case 'int':
-            case 'Integer':
-                if (lowerFieldName.includes('age')) return 25;
-                if (lowerFieldName.includes('count') || lowerFieldName.includes('quantity')) return 10;
-                if (lowerFieldName.includes('year')) return 2024;
-                if (lowerFieldName.includes('month')) return 1;
-                if (lowerFieldName.includes('day')) return 15;
-                return 1;
-            case 'long':
-            case 'Long':
-                if (lowerFieldName.includes('id')) return 123456789;
-                if (lowerFieldName.includes('timestamp')) return 1705312200000;
-                return 1000000;
-            case 'double':
-            case 'Double':
-                if (lowerFieldName.includes('price') || lowerFieldName.includes('amount')) return 99.99;
-                if (lowerFieldName.includes('rate') || lowerFieldName.includes('percentage')) return 0.15;
-                return 1.5;
-            case 'float':
-            case 'Float':
-                return 1.5;
-            case 'boolean':
-            case 'Boolean':
-                if (lowerFieldName.includes('active') || lowerFieldName.includes('enabled')) return true;
-                if (lowerFieldName.includes('deleted') || lowerFieldName.includes('disabled')) return false;
-                return true;
-            case 'short':
-            case 'Short':
-                return 1;
-            case 'byte':
-            case 'Byte':
-                return 1;
-            case 'char':
-            case 'Character':
-                return 'A';
-            case 'BigDecimal':
-                return 99.99;
-            case 'BigInteger':
-                return 1000000;
-            case 'LocalDate':
-                return '2024-01-15';
-            case 'LocalDateTime':
-                return '2024-01-15T10:30:00';
-            case 'Instant':
-                return '2024-01-15T10:30:00Z';
-            case 'Date':
-                return '2024-01-15T10:30:00Z';
-            case 'UUID':
-                return '550e8400-e29b-41d4-a716-446655440000';
-            case 'Object':
-                return {};
-            default:
-                // For custom types, return an empty object
-                return {};
-        }
-    }
-
-    bindPojoToJsonActions() {
-        const convertBtn = document.getElementById('pojo-to-json-btn');
-        const clearBtn = document.getElementById('pojo-clear-btn');
-        const copyBtn = document.getElementById('pojo-copy-btn');
-        const downloadBtn = document.getElementById('pojo-download-btn');
-
-        if (convertBtn) {
-            convertBtn.addEventListener('click', () => this.convertPojoToJson());
-        }
-        if (clearBtn) {
-            clearBtn.addEventListener('click', () => this.clearPojoToJson());
-        }
-        if (copyBtn) {
-            copyBtn.addEventListener('click', () => this.copyPojoToJson());
-        }
-        if (downloadBtn) {
-            downloadBtn.addEventListener('click', () => this.downloadPojoToJson());
-        }
-    }
-
-    clearPojoToJson() {
-        document.getElementById('pojo-input').value = '';
-        document.getElementById('json-output').value = '';
-        this.showStatus('POJO to JSON cleared!', 'success');
-        this.savePojoToJsonToLocalStorage();
-    }
-
-    copyPojoToJson() {
-        const jsonOutput = document.getElementById('json-output').value;
-        if (jsonOutput) {
-            navigator.clipboard.writeText(jsonOutput)
-                .then(() => this.showStatus('JSON copied to clipboard!', 'success'))
-                .catch(() => this.showStatus('Failed to copy', 'error'));
-        } else {
-            this.showStatus('Nothing to copy', 'error');
-        }
-    }
-
-    downloadPojoToJson() {
-        const jsonOutput = document.getElementById('json-output').value;
-        if (jsonOutput) {
-            const blob = new Blob([jsonOutput], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'output.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            this.showStatus('JSON downloaded!', 'success');
-        } else {
-            this.showStatus('Nothing to download', 'error');
-        }
-    }
-
-    savePojoToJsonToLocalStorage() {
-        const pojoInput = document.getElementById('pojo-input').value;
-        localStorage.setItem('jsonpojo_pojo_input', pojoInput);
-    }
-
-    restorePojoToJsonFromLocalStorage() {
-        const pojoInput = localStorage.getItem('jsonpojo_pojo_input');
-        if (pojoInput !== null) {
-            document.getElementById('pojo-input').value = pojoInput;
-            this.convertPojoToJson(); // Trigger conversion to restore output
-        }
-    }
-
-    // ==================== Utility Functions ====================
-    toCamelCase(str) {
-        // Handle snake_case and kebab-case
-        return str
-            .replace(/[-_](.)/g, (_, char) => char.toUpperCase())
-            .replace(/^./, char => char.toLowerCase());
-    }
-
-    toPascalCase(str) {
-        // Handle snake_case and kebab-case
-        const camelCase = this.toCamelCase(str);
-        return camelCase.charAt(0).toUpperCase() + camelCase.slice(1);
-    }
-
-    singularize(str) {
-        // Simple singularization
-        if (str.endsWith('ies')) {
-            return str.slice(0, -3) + 'y';
-        }
-        if (str.endsWith('es')) {
-            return str.slice(0, -2);
-        }
-        if (str.endsWith('s') && !str.endsWith('ss')) {
-            return str.slice(0, -1);
-        }
-        return str;
-    }
-
-    updateStats() {
-        document.getElementById('stats').classList.remove('hidden');
-        document.getElementById('class-count').textContent = this.classCount;
-        document.getElementById('field-count').textContent = this.fieldCount;
-        document.getElementById('annotation-count').textContent = this.annotationCount;
-    }
-
-    showStatus(message, type) {
-        const statusEl = document.getElementById('status');
-        statusEl.textContent = message;
-        statusEl.className = `status ${type}`;
-        statusEl.classList.remove('hidden');
-
-        setTimeout(() => {
-            statusEl.classList.add('hidden');
-        }, 3000);
-    }
-
     saveToLocalStorage() {
         const input = this.jsonInput.value;
-        const options = {};
-        this.optionsForm.querySelectorAll('input,select,textarea').forEach(el => {
-            if (el.type === 'checkbox') {
-                options[el.name] = el.checked;
-            } else {
-                options[el.name] = el.value;
-            }
-        });
+        const options = getOptions();
         const packageName = document.getElementById('package-name').value;
         const className = document.getElementById('class-name').value;
-        localStorage.setItem('jsonpojo_input', input);
-        localStorage.setItem('jsonpojo_options', JSON.stringify(options));
-        localStorage.setItem('jsonpojo_package', packageName);
-        localStorage.setItem('jsonpojo_classname', className);
-    }
-
-    restoreFromLocalStorage() {
-        const input = localStorage.getItem('jsonpojo_input');
-        const options = localStorage.getItem('jsonpojo_options');
-        const packageName = localStorage.getItem('jsonpojo_package');
-        const className = localStorage.getItem('jsonpojo_classname');
-        if (input !== null) {
-            this.jsonInput.value = input;
-        }
-        if (packageName !== null) {
-            document.getElementById('package-name').value = packageName;
-        }
-        if (className !== null) {
-            document.getElementById('class-name').value = className;
-        }
-        if (options !== null) {
-            try {
-                const opts = JSON.parse(options);
-                this.optionsForm.querySelectorAll('input,select,textarea').forEach(el => {
-                    if (el.type === 'checkbox') {
-                        el.checked = !!opts[el.name];
-                    } else if (opts[el.name] !== undefined) {
-                        el.value = opts[el.name];
-                    }
-                });
-            } catch (e) {}
-        }
-        // Output is always generated from input/options, so no need to restore output directly
-        // Instead, trigger auto-convert if input/options exist
-        if (input !== null || options !== null) {
-            this.convert();
-        }
+        saveToLocalStorage(input, options, packageName, className);
     }
 }
 
-// Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
     new JsonToPojoConverter();
     
