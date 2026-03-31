@@ -6,6 +6,7 @@ A client-side web tool for converting JSON to Java POJO classes with Lombok anno
 
 ## Features
 
+### JSON to POJO Conversion
 - ✅ Convert JSON to Java POJO classes
 - ✅ Generate Lombok annotations (@Data, @Builder, @NoArgsConstructor, @AllArgsConstructor, etc.)
 - ✅ Jackson annotations support (@JsonProperty)
@@ -20,6 +21,21 @@ A client-side web tool for converting JSON to Java POJO classes with Lombok anno
 - ✅ Dark/Light mode toggle
 - ✅ Responsive design
 - ✅ Statistics display (classes, fields, annotations count)
+
+### POJO to JSON Conversion
+- ✅ Convert Java POJO classes to JSON
+- ✅ Support for primitive types (int, long, double, boolean, etc.)
+- ✅ Support for wrapper types (Integer, Long, Double, Boolean, etc.)
+- ✅ Support for String type
+- ✅ Support for collection types (List, ArrayList, Set, Map)
+- ✅ Support for array types
+- ✅ Support for Java 8 date/time types (LocalDate, LocalDateTime, Instant)
+- ✅ Support for BigDecimal and BigInteger
+- ✅ Support for UUID type
+- ✅ Smart sample value generation based on field names
+- ✅ Copy JSON to clipboard
+- ✅ Download as .json file
+- ✅ Local storage persistence
 
 ## Lombok Annotations Supported
 
@@ -68,7 +84,9 @@ Then open `http://localhost:8000` in your browser.
 
 ## Example
 
-### Input JSON
+### JSON to POJO
+
+#### Input JSON
 ```json
 {
   "id": 1,
@@ -84,7 +102,7 @@ Then open `http://localhost:8000` in your browser.
 }
 ```
 
-### Output POJO (with @Data and Jackson annotations)
+#### Output POJO (with @Data and Jackson annotations)
 ```java
 package com.example.model;
 
@@ -117,6 +135,30 @@ public class Address {
 
     @JsonProperty("zipCode")
     private String zipCode;
+}
+```
+
+### POJO to JSON
+
+#### Input POJO
+```java
+public class User {
+    private String name;
+    private String email;
+    private Integer age;
+    private Boolean active;
+    private List<String> roles;
+}
+```
+
+#### Output JSON
+```json
+{
+  "name": "John Doe",
+  "email": "user@example.com",
+  "age": 25,
+  "active": true,
+  "roles": ["sample string"]
 }
 ```
 

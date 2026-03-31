@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="author" content="Heru Rusdianto">
-    <title>JSON to POJO - Convert JSON to Java POJO with Lombok</title>
+    <title>JSON ⇄ POJO Converter</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
 </head>
@@ -23,133 +23,175 @@
     </div>
 
     <header>
-        <h1>JSON to POJO Converter</h1>
-        <p>Convert JSON to Java POJO classes with Lombok annotations</p>
+        <h1>JSON ⇄ POJO Converter</h1>
+        <p>Convert JSON to Java POJO classes and vice versa</p>
         <p class="client-side-note"><strong>100% Client-side:</strong> All conversion is done in your browser. <u>No data is sent to any server.</u></p>
+        
+        <!-- Mode Toggle -->
+        <div class="mode-toggle">
+            <button id="mode-json-to-pojo" class="mode-btn active">JSON to POJO</button>
+            <button id="mode-pojo-to-json" class="mode-btn">POJO to JSON</button>
+        </div>
     </header>
 
     <div class="container">
-        <div class="main-content">
-            <div class="input-section">
-                <!-- Load Example Button (moved to top) -->
-                <div class="example-btn-top-wrapper">
-                    <button class="example-btn" id="example-btn">Load Example</button>
-                </div>
-
-                <h2>JSON Input</h2>
-
-                <!-- Class Name Input -->
-                <div class="class-name-section">
-                    <label for="class-name">Root Class Name</label>
-                    <input type="text" id="class-name" placeholder="MyClass" value="MyClass">
-                </div>
-
-                <!-- Package Name Input -->
-                <div class="package-section">
-                    <label for="package-name">Package Name (optional)</label>
-                    <input type="text" id="package-name" placeholder="com.example.model">
-                </div>
-
-                <!-- JSON Input -->
-                <div class="json-input-section">
-                    <label for="json-input">Paste your JSON here</label>
-                    <textarea id="json-input" placeholder='{"name": "John", "age": 30, "active": true}'></textarea>
-                </div>
-
-                <!-- Lombok Options -->
-                <div class="settings-section">
-                    <h3>Lombok Annotations</h3>
-                    <div class="options-grid">
-                        <label class="option-item">
-                            <input type="checkbox" id="use-data" name="use-data" checked>
-                            <span>@Data</span>
-                        </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="use-builder" name="use-builder" checked>
-                            <span>@Builder</span>
-                        </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="use-noargs" name="use-noargs" checked>
-                            <span>@NoArgsConstructor</span>
-                        </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="use-allargs" name="use-allargs" checked>
-                            <span>@AllArgsConstructor</span>
-                        </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="use-getter" name="use-getter">
-                            <span>@Getter</span>
-                        </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="use-setter" name="use-setter">
-                            <span>@Setter</span>
-                        </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="use-tostring" name="use-tostring" checked>
-                            <span>@ToString</span>
-                        </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="use-equals" name="use-equals">
-                            <span>@EqualsAndHashCode</span>
-                        </label>
+        <!-- JSON to POJO Section -->
+        <div id="json-to-pojo-section" class="converter-section active">
+            <div class="main-content">
+                <div class="input-section">
+                    <!-- Load Example Button (moved to top) -->
+                    <div class="example-btn-top-wrapper">
+                        <button class="example-btn" id="example-btn">Load Example</button>
                     </div>
 
-                    <h3>Additional Options</h3>
-                    <div class="options-grid">
-                        <label class="option-item">
-                            <input type="checkbox" id="use-jackson" name="use-jackson" checked>
-                            <span>Jackson Annotations</span>
-                        </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="use-private" name="use-private" checked>
-                            <span>Private Fields</span>
-                        </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="generate-nested" name="generate-nested" checked>
-                            <span>Generate Nested Classes</span>
-                        </label>
-                        <label class="option-item">
-                            <input type="checkbox" id="use-primitives" name="use-primitives">
-                            <span>Use Primitive Types</span>
-                        </label>
+                    <h2>JSON Input</h2>
+
+                    <!-- Class Name Input -->
+                    <div class="class-name-section">
+                        <label for="class-name">Root Class Name</label>
+                        <input type="text" id="class-name" placeholder="MyClass" value="MyClass">
+                    </div>
+
+                    <!-- Package Name Input -->
+                    <div class="package-section">
+                        <label for="package-name">Package Name (optional)</label>
+                        <input type="text" id="package-name" placeholder="com.example.model">
+                    </div>
+
+                    <!-- JSON Input -->
+                    <div class="json-input-section">
+                        <label for="json-input">Paste your JSON here</label>
+                        <textarea id="json-input" placeholder='{"name": "John", "age": 30, "active": true}'></textarea>
+                    </div>
+
+                    <!-- Lombok Options -->
+                    <div class="settings-section">
+                        <h3>Lombok Annotations</h3>
+                        <div class="options-grid">
+                            <label class="option-item">
+                                <input type="checkbox" id="use-data" name="use-data" checked>
+                                <span>@Data</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" id="use-builder" name="use-builder" checked>
+                                <span>@Builder</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" id="use-noargs" name="use-noargs" checked>
+                                <span>@NoArgsConstructor</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" id="use-allargs" name="use-allargs" checked>
+                                <span>@AllArgsConstructor</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" id="use-getter" name="use-getter">
+                                <span>@Getter</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" id="use-setter" name="use-setter">
+                                <span>@Setter</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" id="use-tostring" name="use-tostring" checked>
+                                <span>@ToString</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" id="use-equals" name="use-equals">
+                                <span>@EqualsAndHashCode</span>
+                            </label>
+                        </div>
+
+                        <h3>Additional Options</h3>
+                        <div class="options-grid">
+                            <label class="option-item">
+                                <input type="checkbox" id="use-jackson" name="use-jackson" checked>
+                                <span>Jackson Annotations</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" id="use-private" name="use-private" checked>
+                                <span>Private Fields</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" id="generate-nested" name="generate-nested" checked>
+                                <span>Generate Nested Classes</span>
+                            </label>
+                            <label class="option-item">
+                                <input type="checkbox" id="use-primitives" name="use-primitives">
+                                <span>Use Primitive Types</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="convert-actions">
+                        <button class="clear-btn" id="clear-btn">Clear</button>
+                        <button class="format-btn" id="format-btn">Format JSON</button>
                     </div>
                 </div>
 
-                <div class="convert-actions">
-                    <button class="clear-btn" id="clear-btn">Clear</button>
-                    <button class="format-btn" id="format-btn">Format JSON</button>
+                <div class="output-section">
+                    <h2>Generated Java POJO</h2>
+
+                    <!-- Stats -->
+                    <div id="stats" class="stats-bar hidden">
+                        <div class="stat-item">
+                            <span class="stat-label">Classes:</span>
+                            <span id="class-count" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Fields:</span>
+                            <span id="field-count" class="stat-value">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Annotations:</span>
+                            <span id="annotation-count" class="stat-value">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Copy All & Download All -->
+                    <div class="global-actions hidden" id="global-actions">
+                        <button class="copy-all-btn" id="copy-all-btn">Copy All</button>
+                        <button class="download-all-btn" id="download-all-btn">Download All</button>
+                    </div>
+
+                    <!-- Container for generated class boxes -->
+                    <div id="classes-container">
+                        <div class="empty-state">
+                            <p>Java POJO classes will appear here...</p>
+                        </div>
+                    </div>
                 </div>
             </div>
+        </div>
 
-            <div class="output-section">
-                <h2>Generated Java POJO</h2>
-
-                <!-- Stats -->
-                <div id="stats" class="stats-bar hidden">
-                    <div class="stat-item">
-                        <span class="stat-label">Classes:</span>
-                        <span id="class-count" class="stat-value">0</span>
+        <!-- POJO to JSON Section -->
+        <div id="pojo-to-json-section" class="converter-section hidden">
+            <div class="main-content">
+                <div class="input-section">
+                    <h2>Java POJO Input</h2>
+                    <div class="pojo-input-wrapper">
+                        <label for="pojo-input">Paste your Java POJO class here</label>
+                        <textarea id="pojo-input" placeholder='public class User {
+    private String name;
+    private Integer age;
+    private Boolean active;
+}'></textarea>
                     </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Fields:</span>
-                        <span id="field-count" class="stat-value">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Annotations:</span>
-                        <span id="annotation-count" class="stat-value">0</span>
+                    <div class="pojo-actions">
+                        <button class="pojo-clear-btn" id="pojo-clear-btn">Clear</button>
+                        <button class="pojo-to-json-btn" id="pojo-to-json-btn">Convert to JSON</button>
                     </div>
                 </div>
 
-                <!-- Copy All & Download All -->
-                <div class="global-actions hidden" id="global-actions">
-                    <button class="copy-all-btn" id="copy-all-btn">Copy All</button>
-                    <button class="download-all-btn" id="download-all-btn">Download All</button>
-                </div>
-
-                <!-- Container for generated class boxes -->
-                <div id="classes-container">
-                    <div class="empty-state">
-                        <p>Java POJO classes will appear here...</p>
+                <div class="output-section">
+                    <h2>Generated JSON</h2>
+                    <div class="json-output-wrapper">
+                        <label for="json-output">JSON output will appear here</label>
+                        <textarea id="json-output" readonly placeholder='JSON output will appear here...'></textarea>
+                    </div>
+                    <div class="json-output-actions">
+                        <button class="pojo-copy-btn" id="pojo-copy-btn">Copy JSON</button>
+                        <button class="pojo-download-btn" id="pojo-download-btn">Download JSON</button>
                     </div>
                 </div>
             </div>
@@ -158,7 +200,7 @@
         <!-- Status Messages -->
         <div id="status" class="status hidden"></div>
     </div>
-
+    
     <footer>
         <p>Created by <a href="https://herusdianto.github.io/" target="_blank" rel="noopener noreferrer">Heru Rusdianto</a> with AI Assistance</p>
         <p class="copyright">
