@@ -138,7 +138,10 @@ public class Address {
 
 MIT License
 
-## Author
+## Contributing
 
-Created by [Heru Rusdianto](https://herusdianto.github.io/) with AI Assistance
+Contributions are welcome! Feel free to submit a Pull Request.
 
+## Demo
+
+[https://herusdianto.github.io/json-pojo/](https://herusdianto.github.io/json-pojo/)
