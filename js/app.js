@@ -20,6 +20,7 @@ class JsonToPojoConverter {
         this.outputContainer = document.getElementById('classes-container');
         // Restore from localStorage if available
         this.restoreFromLocalStorage();
+        this.restorePojoToJsonFromLocalStorage();
         // Remove convert button and auto-trigger convert on input changes
         this.bindAutoConvert();
         this.bindClearButton();
@@ -29,12 +30,53 @@ class JsonToPojoConverter {
         this.initThemeToggle();
         this.bindClassNameChange();
         this.setCurrentYear();
+        this.bindPojoToJsonActions();
+        this.initModeToggle();
     }
 
     setCurrentYear() {
         const yearElement = document.getElementById('currentYear');
         if (yearElement) {
             yearElement.textContent = new Date().getFullYear();
+        }
+    }
+
+    // ==================== Mode Tabs ====================
+    initModeToggle() {
+        const modeTabs = document.querySelectorAll('.mode-tab');
+        const jsonToPojoSection = document.getElementById('json-to-pojo-section');
+        const pojoToJsonSection = document.getElementById('pojo-to-json-section');
+
+        if (!modeTabs.length) return;
+
+        modeTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const mode = tab.getAttribute('data-mode');
+                
+                // Update active tab
+                modeTabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Show corresponding section
+                if (mode === 'json-to-pojo') {
+                    jsonToPojoSection.classList.add('active');
+                    pojoToJsonSection.classList.remove('active');
+                    localStorage.setItem('jsonpojo_mode', 'json-to-pojo');
+                } else {
+                    jsonToPojoSection.classList.remove('active');
+                    pojoToJsonSection.classList.add('active');
+                    localStorage.setItem('jsonpojo_mode', 'pojo-to-json');
+                }
+            });
+        });
+
+        // Restore mode from localStorage
+        const savedMode = localStorage.getItem('jsonpojo_mode');
+        if (savedMode === 'pojo-to-json') {
+            modeTabs.forEach(t => t.classList.remove('active'));
+            document.querySelector('.mode-tab[data-mode="pojo-to-json"]').classList.add('active');
+            jsonToPojoSection.classList.remove('active');
+            pojoToJsonSection.classList.add('active');
         }
     }
 
@@ -648,6 +690,211 @@ class JsonToPojoConverter {
         return imports.sort();
     }
 
+    // ==================== POJO to JSON Conversion ====================
+    convertPojoToJson() {
+        const pojoInput = document.getElementById('pojo-input').value.trim();
+        
+        if (!pojoInput) {
+            this.showStatus('Please enter Java POJO code to convert', 'error');
+            return;
+        }
+
+        try {
+            const jsonObj = this.parsePojoToJson(pojoInput);
+            const jsonOutput = JSON.stringify(jsonObj, null, 2);
+            document.getElementById('json-output').value = jsonOutput;
+            this.showStatus('POJO to JSON conversion successful!', 'success');
+            this.savePojoToJsonToLocalStorage();
+        } catch (e) {
+            this.showStatus('Error parsing POJO: ' + e.message, 'error');
+        }
+    }
+
+    parsePojoToJson(pojoCode) {
+        const result = {};
+        
+        // Remove comments
+        pojoCode = pojoCode.replace(/\/\/[\s\S]*?\n/g, '');
+        pojoCode = pojoCode.replace(/\/\*[\s\S]*?\*\//g, '');
+        
+        // Find all field declarations
+        const fieldPattern = /(?:private|public|protected)?\s+(\w+(?:<[^>]+>)?)\s+(\w+)\s*;/g;
+        let match;
+        
+        while ((match = fieldPattern.exec(pojoCode)) !== null) {
+            const type = match[1];
+            const fieldName = match[2];
+            result[fieldName] = this.generateSampleValue(type, fieldName);
+        }
+        
+        return result;
+    }
+
+    generateSampleValue(type, fieldName) {
+        // Handle generic types like List<String>, Map<String, Object>
+        const genericMatch = type.match(/^(\w+)<(.+)>$/);
+        if (genericMatch) {
+            const containerType = genericMatch[1];
+            const innerType = genericMatch[2];
+            
+            if (containerType === 'List' || containerType === 'ArrayList') {
+                return [this.generateSampleValue(innerType.trim(), fieldName)];
+            }
+            if (containerType === 'Map') {
+                return { "key": this.generateSampleValue(innerType.split(',')[1]?.trim() || 'Object', fieldName) };
+            }
+            if (containerType === 'Set') {
+                return [this.generateSampleValue(innerType.trim(), fieldName)];
+            }
+        }
+        
+        // Handle array types
+        if (type.endsWith('[]')) {
+            const elementType = type.slice(0, -2);
+            return [this.generateSampleValue(elementType, fieldName)];
+        }
+        
+        // Handle primitive and common types
+        const lowerFieldName = fieldName.toLowerCase();
+        
+        switch (type) {
+            case 'String':
+                if (lowerFieldName.includes('email')) return 'user@example.com';
+                if (lowerFieldName.includes('name')) return 'John Doe';
+                if (lowerFieldName.includes('phone')) return '+1-234-567-8900';
+                if (lowerFieldName.includes('address')) return '123 Main Street';
+                if (lowerFieldName.includes('city')) return 'New York';
+                if (lowerFieldName.includes('country')) return 'USA';
+                if (lowerFieldName.includes('url') || lowerFieldName.includes('link')) return 'https://example.com';
+                if (lowerFieldName.includes('date')) return '2024-01-15';
+                if (lowerFieldName.includes('time')) return '10:30:00';
+                return 'sample string';
+            case 'int':
+            case 'Integer':
+                if (lowerFieldName.includes('age')) return 25;
+                if (lowerFieldName.includes('count') || lowerFieldName.includes('quantity')) return 10;
+                if (lowerFieldName.includes('year')) return 2024;
+                if (lowerFieldName.includes('month')) return 1;
+                if (lowerFieldName.includes('day')) return 15;
+                return 1;
+            case 'long':
+            case 'Long':
+                if (lowerFieldName.includes('id')) return 123456789;
+                if (lowerFieldName.includes('timestamp')) return 1705312200000;
+                return 1000000;
+            case 'double':
+            case 'Double':
+                if (lowerFieldName.includes('price') || lowerFieldName.includes('amount')) return 99.99;
+                if (lowerFieldName.includes('rate') || lowerFieldName.includes('percentage')) return 0.15;
+                return 1.5;
+            case 'float':
+            case 'Float':
+                return 1.5;
+            case 'boolean':
+            case 'Boolean':
+                if (lowerFieldName.includes('active') || lowerFieldName.includes('enabled')) return true;
+                if (lowerFieldName.includes('deleted') || lowerFieldName.includes('disabled')) return false;
+                return true;
+            case 'short':
+            case 'Short':
+                return 1;
+            case 'byte':
+            case 'Byte':
+                return 1;
+            case 'char':
+            case 'Character':
+                return 'A';
+            case 'BigDecimal':
+                return 99.99;
+            case 'BigInteger':
+                return 1000000;
+            case 'LocalDate':
+                return '2024-01-15';
+            case 'LocalDateTime':
+                return '2024-01-15T10:30:00';
+            case 'Instant':
+                return '2024-01-15T10:30:00Z';
+            case 'Date':
+                return '2024-01-15T10:30:00Z';
+            case 'UUID':
+                return '550e8400-e29b-41d4-a716-446655440000';
+            case 'Object':
+                return {};
+            default:
+                // For custom types, return an empty object
+                return {};
+        }
+    }
+
+    bindPojoToJsonActions() {
+        const convertBtn = document.getElementById('pojo-to-json-btn');
+        const clearBtn = document.getElementById('pojo-clear-btn');
+        const copyBtn = document.getElementById('pojo-copy-btn');
+        const downloadBtn = document.getElementById('pojo-download-btn');
+
+        if (convertBtn) {
+            convertBtn.addEventListener('click', () => this.convertPojoToJson());
+        }
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => this.clearPojoToJson());
+        }
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => this.copyPojoToJson());
+        }
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', () => this.downloadPojoToJson());
+        }
+    }
+
+    clearPojoToJson() {
+        document.getElementById('pojo-input').value = '';
+        document.getElementById('json-output').value = '';
+        this.showStatus('POJO to JSON cleared!', 'success');
+        this.savePojoToJsonToLocalStorage();
+    }
+
+    copyPojoToJson() {
+        const jsonOutput = document.getElementById('json-output').value;
+        if (jsonOutput) {
+            navigator.clipboard.writeText(jsonOutput)
+                .then(() => this.showStatus('JSON copied to clipboard!', 'success'))
+                .catch(() => this.showStatus('Failed to copy', 'error'));
+        } else {
+            this.showStatus('Nothing to copy', 'error');
+        }
+    }
+
+    downloadPojoToJson() {
+        const jsonOutput = document.getElementById('json-output').value;
+        if (jsonOutput) {
+            const blob = new Blob([jsonOutput], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'output.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            this.showStatus('JSON downloaded!', 'success');
+        } else {
+            this.showStatus('Nothing to download', 'error');
+        }
+    }
+
+    savePojoToJsonToLocalStorage() {
+        const pojoInput = document.getElementById('pojo-input').value;
+        localStorage.setItem('jsonpojo_pojo_input', pojoInput);
+    }
+
+    restorePojoToJsonFromLocalStorage() {
+        const pojoInput = localStorage.getItem('jsonpojo_pojo_input');
+        if (pojoInput !== null) {
+            document.getElementById('pojo-input').value = pojoInput;
+            this.convertPojoToJson(); // Trigger conversion to restore output
+        }
+    }
+
     // ==================== Utility Functions ====================
     toCamelCase(str) {
         // Handle snake_case and kebab-case
@@ -749,4 +996,26 @@ class JsonToPojoConverter {
 // Initialize on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
     new JsonToPojoConverter();
+    
+    // Mode toggle functionality
+    const modeJsonToPojo = document.getElementById('mode-json-to-pojo');
+    const modePojoToJson = document.getElementById('mode-pojo-to-json');
+    const jsonToPojoSection = document.getElementById('json-to-pojo-section');
+    const pojoToJsonSection = document.getElementById('pojo-to-json-section');
+
+    if (modeJsonToPojo && modePojoToJson) {
+        modeJsonToPojo.addEventListener('click', () => {
+            modeJsonToPojo.classList.add('active');
+            modePojoToJson.classList.remove('active');
+            jsonToPojoSection.classList.remove('hidden');
+            pojoToJsonSection.classList.add('hidden');
+        });
+
+        modePojoToJson.addEventListener('click', () => {
+            modePojoToJson.classList.add('active');
+            modeJsonToPojo.classList.remove('active');
+            pojoToJsonSection.classList.remove('hidden');
+            jsonToPojoSection.classList.add('hidden');
+        });
+    }
 });
